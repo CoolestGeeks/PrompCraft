@@ -240,7 +240,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
                             <span>{isParsing ? 'Parsing with AI...' : 'Parse & Refine with AI'}</span>
                         </button>
                     </div>
-                </section>
+                </Section>
             </div>
           )}
         </div>

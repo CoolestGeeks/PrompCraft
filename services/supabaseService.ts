@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseConfig';
-import type { Project, Agent, PromptVersion } from '../types';
+import type { Project, Agent, PromptVersion, PromptConfig } from '../types';
 
 // Helper to get the current user
 const getCurrentUser = async () => {
@@ -18,23 +18,39 @@ export const getProjectsForUser = async (): Promise<Project[] | null> => {
         const user = await getCurrentUser();
         if (!user) return [];
 
-        const { data: projects, error } = await supabase
+        // The generated Supabase types might have issues with deep nesting.
+        // We fetch the data and manually map it to our application types for robustness.
+        const { data, error } = await supabase
             .from('projects')
             .select('*, agents(*, prompt_versions(*))')
             .eq('user_id', user.id);
 
         if (error) throw error;
-        if (!projects) return [];
+        if (!data) return [];
 
-        // Manually structure the data to match types
+        const projects: any[] = data;
+
+        // Manually structure the data to match our application's types
         return projects.map(p => ({
-            ...p,
-            agents: p.agents.map((a: any) => ({
-                ...a,
-                systemPrompt: a.system_prompt, // handle snake_case to camelCase
-                versions: a.prompt_versions.map((v: any) => ({
-                    ...v,
-                    createdAt: new Date(v.created_at)
+            id: p.id,
+            name: p.name,
+            user_id: p.user_id,
+            created_at: p.created_at,
+            agents: (p.agents || []).map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                systemPrompt: a.system_prompt,
+                config: a.config as PromptConfig,
+                project_id: a.project_id,
+                user_id: a.user_id,
+                created_at: a.created_at,
+                versions: (a.prompt_versions || []).map((v: any) => ({
+                    id: v.id,
+                    prompt: v.prompt,
+                    createdAt: new Date(v.created_at),
+                    tag: v.tag,
+                    agent_id: v.agent_id,
+                    user_id: v.user_id,
                 })).sort((v1: PromptVersion, v2: PromptVersion) => new Date(v2.createdAt).getTime() - new Date(v1.createdAt).getTime())
             }))
         }));
@@ -56,7 +72,7 @@ export const createProject = async (name: string): Promise<Project | null> => {
             .single();
         
         if (error) throw error;
-        return { ...data, agents: [] };
+        return { ...(data as any), agents: [] };
     } catch (error) {
         console.error("Error creating project:", error);
         return null;
@@ -77,18 +93,20 @@ export const createAgent = async (projectId: string, agentData: Partial<Agent>):
                 user_id: user.id,
                 name: agentData.name!,
                 system_prompt: agentData.systemPrompt!,
-                config: agentData.config!,
+                config: agentData.config as any,
             })
             .select()
             .single();
 
         if (agentError) throw agentError;
         
+        const newAgent = agent as any;
+
         // Also create the initial prompt version
         const { data: version, error: versionError } = await supabase
             .from('prompt_versions')
             .insert({
-                agent_id: agent.id,
+                agent_id: newAgent.id,
                 user_id: user.id,
                 prompt: agentData.systemPrompt!,
             })
@@ -96,11 +114,13 @@ export const createAgent = async (projectId: string, agentData: Partial<Agent>):
             .single();
             
         if (versionError) throw versionError;
+        
+        const newVersion = version as any;
 
         return { 
-            ...agent, 
-            systemPrompt: agent.system_prompt, 
-            versions: [{...version, createdAt: new Date(version.created_at) }] 
+            ...newAgent, 
+            systemPrompt: newAgent.system_prompt, 
+            versions: [{...newVersion, createdAt: new Date(newVersion.created_at) }] 
         };
 
     } catch (error) {
@@ -137,7 +157,8 @@ export const addPromptVersion = async (agentId: string, prompt: string): Promise
             .single();
         
         if (error) throw error;
-        return {...data, createdAt: new Date(data.created_at)};
+        const newVersion = data as any;
+        return {...newVersion, createdAt: new Date(newVersion.created_at)};
     } catch (error) {
         console.error("Error adding prompt version:", error);
         return null;
