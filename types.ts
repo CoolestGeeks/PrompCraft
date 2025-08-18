@@ -1,20 +1,22 @@
-export type View = 'wizard' | 'playground' | 'library';
 
-export interface Project {
+export type View = 'wizard' | 'playground' | 'library' | 'team';
+
+export interface PromptLibrary {
   id: string;
   name: string;
-  agents: Agent[];
+  prompts: Prompt[];
   user_id: string;
   created_at: string;
+  team_id?: string;
 }
 
-export interface Agent {
+export interface Prompt {
   id: string;
   name:string;
-  systemPrompt: string;
+  system_prompt: string;
   versions: PromptVersion[];
   config: PromptConfig;
-  project_id: string;
+  library_id: string;
   user_id: string;
   created_at: string;
 }
@@ -32,14 +34,33 @@ export interface PromptConfig {
 export interface PromptVersion {
   id: string;
   prompt: string;
-  createdAt: Date | string; // Can be Date object or ISO string from DB
-  tag?: 'Production' | 'Beta' | 'Test';
-  agent_id?: string;
-  user_id?: string;
+  created_at: string;
+  tag?: 'Production' | 'Beta' | 'Test' | null;
+  prompt_id: string;
+  user_id: string;
 }
 
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   image?: string; // base64 encoded image
+}
+
+export interface Team {
+    id: string;
+    name: string;
+    owner_id: string;
+    created_at: string;
+}
+
+export interface TeamMember {
+    id: string;
+    user_id: string;
+    team_id: string;
+    role: 'owner' | 'editor' | 'viewer';
+    created_at: string;
+    profiles: {
+        full_name: string | null;
+        avatar_url: string | null;
+    } | null;
 }

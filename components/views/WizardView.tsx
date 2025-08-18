@@ -1,18 +1,20 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Agent, PromptConfig, PromptVersion } from '../../types';
+import type { Prompt, PromptConfig, PromptVersion } from '../../types';
 import { getPromptSuggestion, parsePromptWithAI } from '../../services/geminiService';
 import { SparklesIcon } from '../icons/SparklesIcon';
 
+
 interface WizardViewProps {
-  agent: Agent;
-  updateAgent: (agent: Agent) => void;
-  saveNewVersion: (agent: Agent, prompt: string) => Promise<PromptVersion | null>;
+  prompt: Prompt;
+  updatePrompt: (prompt: Prompt) => void;
+  saveNewVersion: (prompt: Prompt, promptText: string) => Promise<PromptVersion | null>;
 }
 
 const Section: React.FC<{ title: string; description: string; children: React.ReactNode; onSuggest?: () => void; suggestion?: string; loadingSuggestion?: boolean; }> = 
   ({ title, description, children, onSuggest, suggestion, loadingSuggestion }) => (
   <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-    <div className="flex justify-between items-center">
+    <div className="flex justify-between items-start">
         <div>
             <h3 className="text-lg font-semibold text-white">{title}</h3>
             <p className="text-sm text-gray-400 mt-1">{description}</p>
@@ -21,7 +23,7 @@ const Section: React.FC<{ title: string; description: string; children: React.Re
             <button 
                 onClick={onSuggest} 
                 disabled={loadingSuggestion}
-                className="flex items-center space-x-2 px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors disabled:opacity-50 disabled:cursor-wait">
+                className="flex items-center space-x-2 px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors disabled:opacity-50 disabled:cursor-wait flex-shrink-0 ml-4">
                 <SparklesIcon/>
                 <span>{loadingSuggestion ? 'Thinking...' : 'Suggest'}</span>
             </button>
@@ -75,20 +77,20 @@ const TagInput: React.FC<{ tags: string[]; onTagsChange: (tags: string[]) => voi
 };
 
 
-export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, saveNewVersion }) => {
-  const [config, setConfig] = useState<PromptConfig>(agent.config);
+export const WizardView: React.FC<WizardViewProps> = ({ prompt, updatePrompt, saveNewVersion }) => {
+  const [config, setConfig] = useState<PromptConfig>(prompt.config);
   const [suggestions, setSuggestions] = useState<Record<string, string>>({});
   const [loadingSuggestions, setLoadingSuggestions] = useState<Record<string, boolean>>({});
   
   const [creationMode, setCreationMode] = useState<'guided' | 'direct'>('guided');
-  const [directPromptInput, setDirectPromptInput] = useState(agent.systemPrompt);
+  const [directPromptInput, setDirectPromptInput] = useState(prompt.system_prompt);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setConfig(agent.config);
-    setDirectPromptInput(agent.systemPrompt);
-  }, [agent]);
+    setConfig(prompt.config);
+    setDirectPromptInput(prompt.system_prompt);
+  }, [prompt]);
   
   const handleConfigChange = <K extends keyof PromptConfig,>(field: K, value: PromptConfig[K]) => {
     setConfig(prev => ({...prev, [field]: value}));
@@ -108,23 +110,25 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
 
   useEffect(() => {
     if (creationMode === 'guided') {
-      const newPrompt = assemblePrompt(config);
-      if (newPrompt !== agent.systemPrompt) {
-        updateAgent({...agent, config, systemPrompt: newPrompt});
+      const newPromptText = assemblePrompt(config);
+      if (newPromptText !== prompt.system_prompt || JSON.stringify(config) !== JSON.stringify(prompt.config)) {
+        updatePrompt({...prompt, config, system_prompt: newPromptText});
       }
     }
-  }, [config, creationMode, agent, updateAgent, assemblePrompt]);
+  }, [config, creationMode, prompt, updatePrompt, assemblePrompt]);
 
-  const handleDirectPromptChange = (prompt: string) => {
-    setDirectPromptInput(prompt);
-    updateAgent({ ...agent, systemPrompt: prompt });
+  const handleDirectPromptChange = (promptText: string) => {
+    setDirectPromptInput(promptText);
+    updatePrompt({ ...prompt, system_prompt: promptText });
   };
   
-  const handleParseAndRefine = async () => {
+  const handleParseAndRefine = async (promptToParse: string) => {
     setIsParsing(true);
     try {
-        const parsedConfig = await parsePromptWithAI(directPromptInput);
+        const parsedConfig = await parsePromptWithAI(promptToParse);
         setConfig(parsedConfig);
+        setDirectPromptInput(promptToParse);
+        updatePrompt({ ...prompt, system_prompt: promptToParse, config: parsedConfig });
         setCreationMode('guided');
     } catch (error) {
         alert(error instanceof Error ? error.message : "An unknown error occurred during parsing.");
@@ -135,7 +139,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
   
   const handleSaveVersion = async () => {
       setIsSaving(true);
-      const newVersion = await saveNewVersion(agent, agent.systemPrompt);
+      const newVersion = await saveNewVersion(prompt, prompt.system_prompt);
       if (newVersion) {
         alert('New version saved!');
       } else {
@@ -158,7 +162,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold text-white">Prompt Wizard</h2>
-              <p className="text-gray-400">Craft the perfect system prompt for <span className="font-semibold text-accent">{agent.name}</span>.</p>
+              <p className="text-gray-400">Craft the perfect system prompt for <span className="font-semibold text-accent">{prompt.name}</span>.</p>
             </div>
             <button 
                 onClick={handleSaveVersion}
@@ -189,23 +193,23 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
           
           {creationMode === 'guided' ? (
             <div className="space-y-6">
-              <Section title="Persona & Role" description="Who is the agent? Define its identity and background." onSuggest={() => handleSuggest('persona')} suggestion={suggestions.persona} loadingSuggestion={loadingSuggestions.persona}>
+              <Section title="Persona & Role" description="Who is the AI? Define its identity and background." onSuggest={() => handleSuggest('persona')} suggestion={suggestions.persona} loadingSuggestion={loadingSuggestions.persona}>
                   <input type="text" value={config.persona} onChange={e => handleConfigChange('persona', e.target.value)} placeholder="e.g., You are a senior data scientist named Dr. Anya Sharma." className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
               </Section>
               
-              <Section title="Core Objective" description="What is the agent's single most important goal?" onSuggest={() => handleSuggest('mission')} suggestion={suggestions.mission} loadingSuggestion={loadingSuggestions.mission}>
-                  <textarea value={config.mission} onChange={e => handleConfigChange('mission', e.target.value)} placeholder="e.g., To help users analyze and visualize datasets by writing Python code." className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 h-24 font-mono focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
+              <Section title="Core Objective" description="What is the AI's single most important goal?" onSuggest={() => handleSuggest('mission')} suggestion={suggestions.mission} loadingSuggestion={loadingSuggestions.mission}>
+                  <textarea value={config.mission} onChange={e => handleConfigChange('mission', e.target.value)} placeholder="e.g., To help users analyze and visualize datasets by writing Python code." className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 h-24 font-mono text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
               </Section>
 
-              <Section title="Capabilities & Skills" description="What can the agent do? Enter skills and press Enter." onSuggest={() => handleSuggest('skills')} suggestion={suggestions.skills} loadingSuggestion={loadingSuggestions.skills}>
+              <Section title="Capabilities & Skills" description="What can the AI do? Enter skills and press Enter." onSuggest={() => handleSuggest('skills')} suggestion={suggestions.skills} loadingSuggestion={loadingSuggestions.skills}>
                   <TagInput tags={config.skills} onTagsChange={(tags) => handleConfigChange('skills', tags)} placeholder="e.g., Code Interpretation, Data Analysis..." />
               </Section>
 
-              <Section title="Constraints & Boundaries" description="What are the critical 'do nots' for the agent?" onSuggest={() => handleSuggest('boundaries')} suggestion={suggestions.boundaries} loadingSuggestion={loadingSuggestions.boundaries}>
+              <Section title="Constraints & Boundaries" description="What are the critical 'do nots' for the AI?" onSuggest={() => handleSuggest('boundaries')} suggestion={suggestions.boundaries} loadingSuggestion={loadingSuggestions.boundaries}>
                   <TagInput tags={config.boundaries} onTagsChange={(tags) => handleConfigChange('boundaries', tags)} placeholder="e.g., Never provide financial advice..." />
               </Section>
 
-              <Section title="Interaction Style & Tone" description="How should the agent behave and sound?">
+              <Section title="Interaction Style & Tone" description="How should the AI behave and sound?">
                   <select value={config.personality} onChange={e => handleConfigChange('personality', e.target.value as PromptConfig['personality'])} className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-accent focus:border-accent outline-none">
                       <option>Professional</option>
                       <option>Casual</option>
@@ -218,8 +222,8 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
                   <input type="text" value={config.format} onChange={e => handleConfigChange('format', e.target.value)} placeholder="e.g., Always respond in valid JSON with keys `explanation` and `code`" className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
               </Section>
 
-              <Section title="Knowledge Source & Reference" description="Paste any context, few-shot examples, or data the agent must use.">
-                  <textarea value={config.reference} onChange={e => handleConfigChange('reference', e.target.value)} placeholder="Paste your reference text here..." className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 h-40 font-mono focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
+              <Section title="Knowledge Source & Reference" description="Paste any context, few-shot examples, or data the prompt must use.">
+                  <textarea value={config.reference} onChange={e => handleConfigChange('reference', e.target.value)} placeholder="Paste your reference text here..." className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 h-40 font-mono text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
               </Section>
             </div>
           ) : (
@@ -229,11 +233,11 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
                         value={directPromptInput} 
                         onChange={e => handleDirectPromptChange(e.target.value)} 
                         placeholder="Paste your system prompt here..." 
-                        className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 h-96 font-mono focus:ring-2 focus:ring-accent focus:border-accent outline-none" 
+                        className="w-full bg-gray-900 border border-gray-600 rounded-md p-2 h-96 font-mono text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none" 
                     />
                     <div className="mt-4 flex justify-end">
                         <button
-                            onClick={handleParseAndRefine}
+                            onClick={() => handleParseAndRefine(directPromptInput)}
                             disabled={isParsing}
                             className="flex items-center space-x-2 px-4 py-2 text-sm bg-accent hover:bg-accent-hover rounded-md text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-wait">
                             <SparklesIcon/>
@@ -245,9 +249,9 @@ export const WizardView: React.FC<WizardViewProps> = ({ agent, updateAgent, save
           )}
         </div>
       </div>
-      <div className="w-1/3 bg-gray-900 p-6 border-l border-gray-700 overflow-y-auto">
+      <div className="w-1/3 bg-gray-800 p-6 border-l border-gray-700 overflow-y-auto">
         <h3 className="text-lg font-semibold text-white mb-4">Real-time Prompt Preview</h3>
-        <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-gray-800 p-4 rounded-md font-mono border border-gray-700 h-full">{agent.systemPrompt}</pre>
+        <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-gray-900 p-4 rounded-md font-mono border border-gray-700 h-full">{prompt.system_prompt}</pre>
       </div>
     </div>
   );

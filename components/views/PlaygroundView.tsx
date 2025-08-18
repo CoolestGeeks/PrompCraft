@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Agent, ChatMessage } from '../../types';
+import type { Prompt, ChatMessage } from '../../types';
 import { generateChatResponseStream } from '../../services/geminiService';
 import { SendIcon } from '../icons/SendIcon';
 import { PaperclipIcon } from '../icons/PaperclipIcon';
@@ -10,8 +10,8 @@ import { ThumbsUpIcon } from '../icons/ThumbsUpIcon';
 import { ThumbsDownIcon } from '../icons/ThumbsDownIcon';
 
 interface PlaygroundViewProps {
-  agent: Agent;
-  updateAgent: (agent: Agent) => void;
+  prompt: Prompt;
+  updatePrompt: (prompt: Prompt) => void;
 }
 
 const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
@@ -34,8 +34,8 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     );
 };
 
-export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ agent, updateAgent }) => {
-  const [currentSystemPrompt, setCurrentSystemPrompt] = useState(agent.systemPrompt);
+export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ prompt, updatePrompt }) => {
+  const [currentSystemPrompt, setCurrentSystemPrompt] = useState(prompt.system_prompt);
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [image, setImage] = useState<string | null>(null);
@@ -47,8 +47,8 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ agent, updateAge
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setCurrentSystemPrompt(agent.systemPrompt);
-  }, [agent.systemPrompt]);
+    setCurrentSystemPrompt(prompt.system_prompt);
+  }, [prompt.system_prompt]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -115,7 +115,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ agent, updateAge
                     <div className="text-center text-gray-500 pt-20">
                         <BotIcon className="w-16 h-16 mx-auto mb-4"/>
                         <h3 className="text-xl font-bold">Testing Playground</h3>
-                        <p>Start a conversation to test your agent.</p>
+                        <p>Start a conversation to test your prompt.</p>
                     </div>
                 )}
                 {history.map((msg, i) => <ChatBubble key={i} message={msg}/>)}
@@ -139,7 +139,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ agent, updateAge
                         handleSubmit(e);
                     }
                   }}
-                  placeholder={`Chat with ${agent.name}...`}
+                  placeholder={`Chat with ${prompt.name}...`}
                   className="w-full bg-gray-800 border border-gray-600 rounded-md p-3 pr-24 resize-none focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                   rows={2}
                   disabled={isLoading}
@@ -147,7 +147,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ agent, updateAge
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
                     <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden"/>
                     <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-white" disabled={isLoading}><PaperclipIcon/></button>
-                    <button type="submit" className="p-2 bg-accent rounded-md text-white hover:bg-accent-hover disabled:bg-gray-600" disabled={isLoading || !userInput.trim()}><SendIcon/></button>
+                    <button type="submit" className="p-2 bg-accent rounded-md text-white hover:bg-accent-hover disabled:bg-gray-600" disabled={isLoading || (!userInput.trim() && !image)}><SendIcon/></button>
                 </div>
             </form>
         </div>

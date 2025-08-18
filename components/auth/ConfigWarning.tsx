@@ -1,12 +1,11 @@
-
 import React from 'react';
 import { LogoIcon } from '../icons/LogoIcon';
 
 export const ConfigWarning: React.FC = () => {
   const codeBlock = `
 // supabaseConfig.ts
-const supabaseUrl = 'https://your-project-ref.supabase.co';
-const supabaseAnonKey = 'your-public-anon-key';
+export const supabaseUrl = 'https://your-project-ref.supabase.co';
+export const supabaseAnonKey = 'your-public-anon-key';
   `;
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-200">
