@@ -1,4 +1,6 @@
-import { createClient, SupabaseClient, type Json } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
@@ -192,4 +194,4 @@ export type Database = {
 export const supabaseUrl = 'https://butbioonkfujhdydzhwx.supabase.co';
 export const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1dGJpb29ua2Z1amhkeWR6aHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0MzQxMDUsImV4cCI6MjA2NDAxMDEwNX0.wL0NO2DtnkVPiUuai-Fnw5drKFDuQIwm1Ojwgf4xBs0';
 
-export const supabase: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
